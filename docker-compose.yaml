@@ -1,0 +1,54 @@
+services:
+  curl-jq:
+    image: badouralix/curl-jq
+    networks:
+      - homework_token_issuer
+
+  packager:
+    build: ./packager
+    volumes:
+      - ./:/src
+
+  aws-cli:
+    image: amazon/aws-cli
+    environment:
+      - AWS_DEFAULT_REGION=eu-west-1
+      - AWS_ACCESS_KEY_ID=key
+      - AWS_SECRET_ACCESS_KEY=secret
+    networks:
+      - homework_token_issuer
+    volumes:
+      # share lambda source code with localstack
+      - ./build:/build
+
+  token-verifier:
+    build: ./token-verifier
+    networks:
+      - homework_token_issuer
+
+  localstack:
+    image: localstack/localstack:3.6.0
+    ports:
+      - "4566:4566" # LocalStack edge port
+      - "4571:4571" # KMS
+    environment:
+      - ENABLE_CONFIG_UPDATES=1
+      - SERVICES=dynamodb,apigateway,lambda,kms
+      - DEBUG=1
+      # set AWS configrations for localstack
+      - AWS_DEFAULT_REGION=eu-west-1
+      - AWS_ACCESS_KEY_ID=key
+      - AWS_SECRET_ACCESS_KEY=secret
+    networks:
+      - homework_token_issuer
+    volumes:
+      # share lambda source code with localstack
+      - ./build:/etc/localstack/init/build
+      # provision resources in localstack
+      - ./init-scripts:/etc/localstack/init/ready.d
+      # localstack needs docker to run lambdas
+      - "/var/run/docker.sock:/var/run/docker.sock"
+
+networks:
+  homework_token_issuer:
+    driver: bridge
